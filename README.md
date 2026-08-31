@@ -1,140 +1,219 @@
 # nestdaq-eicrecon-zmq-plugin
 
-JANA2/EICrecon plugin that receives NestDAQ `TimeFrameBuilder` output over ZeroMQ and exposes decoded hits as `edm4eic::RawTrackerHitCollection` objects inside a `JEvent`.
+JANA2/EICrecon plugin that receives NestDAQ `TimeFrameBuilder` output over ZeroMQ, decodes the NestDAQ multipart data, converts selected HRTDC hits into `edm4eic::RawTrackerHitCollection`, and passes those collections to downstream JANA2/EICrecon processors.
 
 ## Data flow
 
 ```text
-STFBFilePlayer
-    PUSH
-      |
-      v
-TimeFrameBuilder in   tcp://127.0.0.1:5500
-TimeFrameBuilder out  tcp://127.0.0.1:5501  (PUSH / bind)
-      |
-      v
-NestDAQZmqSource      (PULL / connect)
-      |
-      v
-edm4eic::RawTrackerHitCollection
-      |
-      v
-JANA2 / EICrecon factories and processors
+TimeFrameBuilder
+  PUSH / bind : tcp://127.0.0.1:5501
+        |
+        v
+NestDAQZmqSource
+  - ZeroMQ PULL/connect
+  - receives one complete multipart TimeFrame
+        |
+        v
+NestDAQDecoder
+  - parses TF / STF / HBF headers
+  - decodes AmQStrTdc words
+  - produces NestDAQTimeFrameData
+        |
+        v
+EDM4eicConverter
+  - selects the HRTDC/FEM mapping
+  - fills edm4eic::RawTrackerHitCollection
+  - inserts collections into the JEvent/PODIO Frame
+        |
+        v
+RawHitProcessor
+  - example downstream analysis processor
+  - reads only EDM4eic collections
 ```
 
-The current default output port from `TimeFrameBuilder` is **5501**.
+The separation is intentional: the ZMQ transport layer does not know about detector mapping, the NestDAQ decoder does not depend on EDM4eic, and the analysis processor does not need to know anything about NestDAQ or ZeroMQ.
 
 ## Repository layout
 
 ```text
 .
 ├── include/
+│   ├── NestDAQZmqSource.h
+│   ├── NestDAQDecoder.h
+│   ├── NestDAQData.h
+│   ├── EDM4eicConverter.h
+│   ├── RawHitProcessor.h
 │   ├── AmQStrTdcData.h
 │   ├── HeartbeatFrameHeader.h
 │   ├── SubTimeFrameHeader.h
 │   └── TimeFrameHeader.h
+├── src/
+│   ├── NestDAQZmqSource.cc
+│   ├── NestDAQDecoder.cc
+│   ├── EDM4eicConverter.cc
+│   ├── RawHitProcessor.cc
+│   └── Plugin.cc
 ├── scripts/
 │   ├── build.sh
 │   ├── run-common.sh
 │   ├── run-docker.sh
 │   ├── run-apptainer.sh
 │   └── run.sh
-├── src/
-│   └── nestdaq_zmq_source.cc
 ├── topology/
 │   └── topology.sh
 ├── THIRD_PARTY_LICENSES.md
 └── README.md
 ```
 
-## 1. macOS / Docker / eic-shell
+## Component responsibilities
 
-Install eic-shell:
+### `NestDAQZmqSource`
 
-```bash
-mkdir -p ~/eic
-cd ~/eic
-curl --location https://get.epic-eic.org | bash
+Responsible only for the transport boundary and JANA event-source lifecycle.
+
+It:
+
+- opens a ZeroMQ `PULL` socket;
+- connects to `NESTDAQ_HOST:ZMQ_PORT`;
+- receives all parts of one ZeroMQ multipart message;
+- passes the raw multipart buffers to `NestDAQDecoder`;
+- passes decoded data to `EDM4eicConverter`;
+- sets the JANA event number from the NestDAQ TimeFrame ID.
+
+### `NestDAQDecoder`
+
+Responsible only for decoding NestDAQ data structures.
+
+It parses:
+
+```text
+TimeFrame::Header
+SubTimeFrame::Header
+HeartbeatFrame::Header
+AmQStrTdc::Data::Bits
 ```
 
-Clone this repository:
+and produces the transport-independent intermediate representation:
+
+```cpp
+NestDAQTimeFrameData
+```
+
+The decoder does not create EDM4eic objects.
+
+### `EDM4eicConverter`
+
+Responsible for detector mapping and EDM4eic collection creation.
+
+The current mapping follows the experimental NestDAQ `EDM4eicSink` HRTDC mapping. Only FEM ID
+
+```text
+0xc0a80a29
+```
+
+is converted into:
+
+```text
+HRTDC channel  0-15 -> TOFBarrelADCTDC1, cellID 0-15
+HRTDC channel 16-31 -> TOFBarrelADCTDC2, cellID 0-15
+HRTDC channel 32-47 -> TOFBarrelADCTDC3, cellID 0-15
+```
+
+The converter creates a PODIO `Frame`, inserts the three `edm4eic::RawTrackerHitCollection` objects, and registers them in the `JEvent`.
+
+### `RawHitProcessor`
+
+This is an example downstream analysis processor. It only accesses EDM4eic collections:
+
+```cpp
+const auto* hits =
+    event->GetCollection<edm4eic::RawTrackerHit>(
+        "TOFBarrelADCTDC1"
+    );
+```
+
+Future calibration, clustering, tracking, or detector-specific reconstruction should be added after this boundary using normal JANA2/EICrecon factories/processors rather than adding analysis logic to the ZMQ source.
+
+### `Plugin.cc`
+
+Contains only JANA plugin registration:
+
+```text
+NestDAQZmqSource
+RawHitProcessor
+```
+
+## Build
+
+Clone the repository and enter the EIC software environment:
 
 ```bash
-cd ~/eic
 git clone https://github.com/nobukoba/nestdaq-eicrecon-zmq-plugin.git
 cd nestdaq-eicrecon-zmq-plugin
 ```
 
-Enter eic-shell:
-
-```bash
-~/eic/eic-shell
-```
-
-Build the plugin inside eic-shell:
+Inside eic-shell:
 
 ```bash
 ./scripts/build.sh
 ```
 
-Run it:
+The output is:
+
+```text
+build/nestdaq_zmq_source.so
+```
+
+The plugin links against JANA2, EDM4eic, PODIO, ROOT, and libzmq from the EIC software environment.
+
+## macOS / Docker
+
+Start eic-shell, build, then run:
 
 ```bash
+~/eic/eic-shell
+./scripts/build.sh
 ./scripts/run-docker.sh
 ```
 
-The Docker launcher uses this endpoint by default:
+The Docker launcher defaults to:
 
 ```text
 tcp://host.docker.internal:5501
 ```
 
-This is required when `TimeFrameBuilder` runs on the macOS host and EICrecon runs inside Docker.
-
-To override the host or port:
+Override with:
 
 ```bash
 NESTDAQ_HOST=host.docker.internal ZMQ_PORT=5501 ./scripts/run-docker.sh
 ```
 
-## 2. Linux / Apptainer
+## Linux / Apptainer
 
-Clone the repository on the Linux host:
-
-```bash
-git clone https://github.com/nobukoba/nestdaq-eicrecon-zmq-plugin.git
-cd nestdaq-eicrecon-zmq-plugin
-```
-
-Enter the EIC Apptainer environment, then build:
+Inside the EIC Apptainer environment:
 
 ```bash
 ./scripts/build.sh
-```
-
-Run:
-
-```bash
 ./scripts/run-apptainer.sh
 ```
 
-The Apptainer launcher uses this endpoint by default:
+The Apptainer launcher defaults to:
 
 ```text
 tcp://127.0.0.1:5501
 ```
 
-This assumes Apptainer is using the host network namespace, which is the normal behavior when it is started without `--net`.
+This assumes Apptainer is using the host network namespace and was not started with `--net`.
 
-To override:
+Override with:
 
 ```bash
 NESTDAQ_HOST=127.0.0.1 ZMQ_PORT=5501 ./scripts/run-apptainer.sh
 ```
 
-## 3. NestDAQ topology
+## NestDAQ topology
 
-The important endpoint is the `TimeFrameBuilder` output:
+The important output endpoint is:
 
 ```bash
 endpoint TimeFrameBuilder out \
@@ -145,7 +224,7 @@ endpoint TimeFrameBuilder out \
     portRangeMax 5501
 ```
 
-`STFBFilePlayer` must also be linked to `TimeFrameBuilder in`:
+The upstream input side is normally:
 
 ```bash
 endpoint STFBFilePlayer out \
@@ -155,112 +234,51 @@ endpoint STFBFilePlayer out \
 
 endpoint TimeFrameBuilder in \
     type pull \
-    method bind
+    method bind \
+    enable-uds false \
+    portRangeMin 5500 \
+    portRangeMax 5500
 
 link STFBFilePlayer out TimeFrameBuilder in
 ```
 
-A complete example is provided in:
+A complete example is in `topology/topology.sh`.
 
-```text
-topology/topology.sh
-```
+## Runtime diagnostics
 
-When the topology is correct, the TimeFrameBuilder log should contain something like:
-
-```text
-Attached channel in[0]  to tcp://127.0.0.1:5500 (bind) (pull)
-Attached channel out[0] to tcp://127.0.0.1:5501 (bind) (push)
-```
-
-## 4. Build output
-
-After a successful build:
-
-```text
-build/nestdaq_zmq_source.so
-```
-
-The build links against JANA2, EDM4eic, PODIO, ROOT, and libzmq from the EIC software environment.
-
-## 5. Runtime output
-
-On startup, the source prints the endpoint, for example:
+On startup:
 
 ```text
 [NestDAQ] ZMQ PULL connect: tcp://host.docker.internal:5501
 ```
 
-This debug version also prints each received ZeroMQ multipart part:
+For each ZeroMQ multipart part:
 
 ```text
 [ZMQ RECEIVE] 1234 bytes more=1
 ```
 
-If the TCP connection is established but no `[ZMQ RECEIVE]` line appears, `TimeFrameBuilder` has not sent a message yet.
-
-## 6. Data mapping
-
-The source follows the HRTDC mapping used by the experimental NestDAQ `EDM4eicSink` implementation.
-
-Only HRTDC data from FEM ID:
+Decoder diagnostics are separated by layer:
 
 ```text
-0xc0a80a29
+[TF] ...
+[STF] ...
+[HBF] ...
 ```
 
-and FEM types `2` or `5` are converted to the three output collections:
+After EDM4eic conversion:
 
 ```text
-HRTDC channel  0-15 -> TOFBarrelADCTDC1, cellID 0-15
-HRTDC channel 16-31 -> TOFBarrelADCTDC2, cellID 0-15
-HRTDC channel 32-47 -> TOFBarrelADCTDC3, cellID 0-15
+[EDM4eic] event=100212 TOF1=... TOF2=... TOF3=...
 ```
 
-A downstream JANA2/EICrecon component can retrieve a collection with:
-
-```cpp
-const auto* hits =
-    event->GetCollection<edm4eic::RawTrackerHit>(
-        "TOFBarrelADCTDC1"
-    );
-```
-
-The intended processing model is:
+The example downstream processor prints:
 
 ```text
-NestDAQZmqSource
-      -> RawTrackerHitCollection
-      -> JANA2/EICrecon Factory
-      -> reconstructed/calibrated collection
-      -> next Factory or Processor
+[Processor] event=100212 TOF1=... TOF2=... TOF3=...
 ```
 
-## 7. Troubleshooting
-
-Check that `TimeFrameBuilder` is listening on 5501:
-
-```bash
-ss -ltnp | grep 5501
-```
-
-Check for an established connection:
-
-```bash
-ss -tnp | grep 5501
-```
-
-For Docker on macOS, `127.0.0.1` inside the container is the container itself. Use:
-
-```text
-host.docker.internal:5501
-```
-
-For ordinary Apptainer without `--net`, use:
-
-```text
-127.0.0.1:5501
-```
+This makes it easier to identify whether a problem is in ZeroMQ reception, NestDAQ decoding, EDM4eic conversion, or downstream analysis.
 
 ## Third-party headers
 
