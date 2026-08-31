@@ -1,6 +1,7 @@
 #include "RawHitProcessor.h"
 
 #include <edm4eic/RawTrackerHit.h>
+#include <edm4eic/RawTrackerHitCollection.h>
 
 #include <iostream>
 
