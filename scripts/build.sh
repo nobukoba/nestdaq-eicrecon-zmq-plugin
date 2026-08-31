@@ -2,14 +2,18 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="${REPO_ROOT}/src/nestdaq_zmq_source.cc"
+SRC_DIR="${REPO_ROOT}/src"
 BUILD_DIR="${REPO_ROOT}/build"
-
 INCLUDE_DIR="${REPO_ROOT}/include"
 
 mkdir -p "${BUILD_DIR}"
 
-c++ "${SRC}" \
+c++ \
+  "${SRC_DIR}/NestDAQZmqSource.cc" \
+  "${SRC_DIR}/NestDAQDecoder.cc" \
+  "${SRC_DIR}/EDM4eicConverter.cc" \
+  "${SRC_DIR}/RawHitProcessor.cc" \
+  "${SRC_DIR}/Plugin.cc" \
   -std=c++20 \
   -fPIC \
   -shared \
