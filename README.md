@@ -55,10 +55,8 @@ The separation is intentional: the ZMQ transport layer does not know about detec
 │   └── Plugin.cc
 ├── scripts/
 │   ├── build.sh
-│   ├── run-common.sh
-│   ├── run-docker.sh
-│   ├── run-apptainer.sh
-│   └── run.sh
+│   ├── run-eicrecon-docker.sh
+│   └── run-eicrecon-apptainer.sh
 ├── topology/
 │   └── topology.sh
 ├── THIRD_PARTY_LICENSES.md
@@ -173,7 +171,7 @@ Start eic-shell, build, then run:
 ```bash
 ~/eic/eic-shell
 ./scripts/build.sh
-./scripts/run-docker.sh
+./scripts/run-eicrecon-docker.sh
 ```
 
 The Docker launcher defaults to:
@@ -185,7 +183,7 @@ tcp://host.docker.internal:5501
 Override with:
 
 ```bash
-NESTDAQ_HOST=host.docker.internal ZMQ_PORT=5501 ./scripts/run-docker.sh
+NESTDAQ_HOST=host.docker.internal ZMQ_PORT=5501 ./scripts/run-eicrecon-docker.sh
 ```
 
 ## Linux / Apptainer
@@ -194,7 +192,7 @@ Inside the EIC Apptainer environment:
 
 ```bash
 ./scripts/build.sh
-./scripts/run-apptainer.sh
+./scripts/run-eicrecon-apptainer.sh
 ```
 
 The Apptainer launcher defaults to:
@@ -208,7 +206,7 @@ This assumes Apptainer is using the host network namespace and was not started w
 Override with:
 
 ```bash
-NESTDAQ_HOST=127.0.0.1 ZMQ_PORT=5501 ./scripts/run-apptainer.sh
+NESTDAQ_HOST=127.0.0.1 ZMQ_PORT=5501 ./scripts/run-eicrecon-apptainer.sh
 ```
 
 ## NestDAQ topology
