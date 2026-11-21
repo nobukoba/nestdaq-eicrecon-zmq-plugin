@@ -1,20 +1,40 @@
 # SPADI と EICrecon の別コンテナ接続
 
 SPADI の RARiS リプレイは TimeFrameBuilder の PUSH ソケットから TF を
-送信します。このプラグインは EICrecon 側の PULL ソケットで受信します。
-SPADI 側は `spadi-containers-second-trial` の RARiS レシピを使用します。
+送信します。このリポジトリのプラグインは EICrecon 側の PULL ソケットで
+受信します。SPADI 側には `spadi-containers-second-trial` の RARiS レシピを
+使用します。
+検証に使用した SPADI 側の変更は [PR #8](https://github.com/nobukoba/spadi-containers-second-trial/pull/8) で `main` にマージされています。
 
-Linux の Apptainer で EIC `26.11.0-stable` と SPADI を別々に起動し、
-待機 5 ms の run 20 で 2,815 TF、68,956 ヒットを確認しました。各 TF の
-３コレクションの件数もリプレイ記録と一致しました。
+EIC の既存イメージを起動し、このリポジトリのソースをコンテナにマウントして
+プラグインを自分でコンパイルします。ビルド結果はマウントした作業領域の
+`build/nestdaq_zmq_source.so` に保存されます。
 
-EICrecon と SPADI が Linux のホストネットワークを共有する場合、接続先は
-`127.0.0.1:5501` です。Apptainer は通常ホストネットワークを共有します。
-Docker の別コンテナでは通常 `127.0.0.1` が別々なので、ホストネットワーク、
-または相互に到達できるアドレスとポートを設定してください。SPADI の出力が
-`127.0.0.1` にバインドされている場合は、別ネットワークから到達できません。
+## 準備
 
-EIC 環境内でこのリポジトリをビルドします。
+ホストでリポジトリを取得します。
+
+```sh
+git clone https://github.com/nobukoba/nestdaq-eicrecon-zmq-plugin.git
+cd nestdaq-eicrecon-zmq-plugin
+```
+
+EIC 環境は `eicweb/eic_xl:26.11.0-stable` で検証しました。EIC の設定を読み込む
+ため、コンテナ内では `bash -l` を使ってください。別バージョンに変更した場合は
+プラグインをビルドし直します。
+
+## Docker
+
+まず SPADI コンテナ `spadi-raris` を起動し、RARiS レシピの `run-start.sh` を
+実行します。次にホストの別シェルから、EIC コンテナを起動します。
+
+```sh
+docker run --rm -it --network container:spadi-raris \
+  -v "$PWD:/work" -w /work --entrypoint /bin/bash \
+  eicweb/eic_xl:26.11.0-stable -l
+```
+
+コンテナ内でコンパイルし、受信を開始します。
 
 ```sh
 ./scripts/build.sh
@@ -23,6 +43,31 @@ export NESTDAQ_FEM_ID=0xc0a80a28
 ./scripts/run-eicrecon-apptainer.sh
 ```
 
+`--network container:spadi-raris` は２つのコンテナでネットワーク名前空間を
+共有します。SPADI が `127.0.0.1:5501` にバインドしていても接続できます。
+Linux のホストネットワークを共有する構成でも接続可能です。別の Docker
+ネットワーク名前空間では `127.0.0.1` は互いに異なり、SPADI のループバックに
+バインドされたポートへは直接接続できません。
+
+## Apptainer
+
+EIC の SIF を用意し、ホストのリポジトリから起動します。
+
+```sh
+apptainer shell --bind "$PWD:/work" --pwd /work /path/to/eic_xl.sif
+bash -l
+cd /work
+./scripts/build.sh
+export NESTDAQ_HOST=127.0.0.1 ZMQ_PORT=5501
+export NESTDAQ_FEM_ID=0xc0a80a28
+./scripts/run-eicrecon-apptainer.sh
+```
+
+通常の Apptainer はホストネットワークを共有します。`--net` を使用する場合は
+接続先を利用環境に合わせて設定してください。
+
+## 再生と結果の確認
+
 受信側を起動してから、SPADI の Web Control で INIT DEVICE、INIT TASK、RUN
 を実行します。`NESTDAQ_FEM_ID` の既定値は従来の `0xc0a80a29` です。
 RARiS run 20 のサンプルでは `0xc0a80a28` にヒットがあります。
@@ -30,26 +75,7 @@ RARiS run 20 のサンプルでは `0xc0a80a28` にヒットがあります。
 `TOFBarrelADCTDC` コレクションへ入れます。この名前と cellID は変換例であり、
 RARiS の検出器配置や較正が検証されたことを意味しません。
 
+待機 5 ms の run 20 では 2,815 TF、68,956 ヒットを受信し、各 TF の３つの
+コレクションの件数がリプレイ記録と一致することを確認しました。
 TF 出力は PUSH/PULL です。EICrecon と ARTEMIS の両方を同時に接続すると
 TF は両者に複製されず分配されます。別々に再生して比較してください。
-長いリプレイ待機時間を使う場合は、受信側の終了方法やタイムアウトにも注意してください。
-
-Docker を利用する場合、イメージ作成時にプラグインをビルドできます。
-
-```sh
-docker build -t nestdaq-eicrecon:local .
-docker run --rm --network host -e NESTDAQ_FEM_ID=0xc0a80a28 nestdaq-eicrecon:local
-```
-
-これは Linux のホストネットワーク利用例です。SPADI を `spadi-raris` という
-名前の Docker コンテナで起動している場合は、ネットワーク名前空間を共有して
-接続することもできます（両方とも別のコンテナです）。
-
-```sh
-docker run --rm --network container:spadi-raris \
-  -e NESTDAQ_FEM_ID=0xc0a80a28 nestdaq-eicrecon:local
-```
-
-Docker Desktop でこの方法を用い、コンパイラーを遮断した完成イメージから
-2,815 TF・68,956 ヒットを受信し、各イベントの件数を照合しました。作成した
-イメージから SIF を作る方法は、まだ検証していません。

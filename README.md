@@ -105,7 +105,7 @@ The decoder does not create EDM4eic objects.
 
 Responsible for detector mapping and EDM4eic collection creation.
 
-The current mapping follows the experimental NestDAQ `EDM4eicSink` HRTDC mapping. Only FEM ID
+The current mapping follows the experimental NestDAQ `EDM4eicSink` HRTDC mapping. By default FEM ID
 
 ```text
 0xc0a80a29
@@ -165,6 +165,11 @@ Inside eic-shell:
 ```bash
 ./scripts/build.sh
 ```
+
+With an existing EIC container, mount this checkout into the container, enter a
+login shell (`bash -l`), and run the same build command there. The plugin is
+built in the mounted checkout. See the RARiS guides above for complete Docker
+and Apptainer commands.
 
 The output is:
 

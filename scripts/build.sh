@@ -6,6 +6,17 @@ SRC_DIR="${REPO_ROOT}/src"
 BUILD_DIR="${REPO_ROOT}/build"
 INCLUDE_DIR="${REPO_ROOT}/include"
 
+for tool in c++ root-config pkg-config; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "Missing $tool; enter the EIC environment with a login shell (bash -l)." >&2
+    exit 1
+  fi
+done
+if ! pkg-config --exists libzmq; then
+  echo "libzmq development files are unavailable in this EIC environment." >&2
+  exit 1
+fi
+
 mkdir -p "${BUILD_DIR}"
 
 c++ \
