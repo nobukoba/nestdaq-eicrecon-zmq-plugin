@@ -38,5 +38,15 @@ docker build -t nestdaq-eicrecon:local .
 docker run --rm --network host -e NESTDAQ_FEM_ID=0xc0a80a28 nestdaq-eicrecon:local
 ```
 
-This uses Linux host networking. A SIF can also be built from the image and
-started with `NESTDAQ_FEM_ID=0xc0a80a28 apptainer run image.sif`.
+This uses Linux host networking. Alternatively, if the SPADI Docker container
+is named `spadi-raris`, share its network namespace while keeping separate
+containers:
+
+```sh
+docker run --rm --network container:spadi-raris \
+  -e NESTDAQ_FEM_ID=0xc0a80a28 nestdaq-eicrecon:local
+```
+
+This was tested on Docker Desktop with compiler calls blocked: the built image
+received 2,815 TFs and 68,956 hits, with matching per-event counts. Converting
+the built image to SIF has not yet been verified.

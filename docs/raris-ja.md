@@ -41,6 +41,15 @@ docker build -t nestdaq-eicrecon:local .
 docker run --rm --network host -e NESTDAQ_FEM_ID=0xc0a80a28 nestdaq-eicrecon:local
 ```
 
-これは Linux のホストネットワーク利用例です。作成したイメージから SIF を
-作り、`NESTDAQ_FEM_ID=0xc0a80a28 apptainer run image.sif` としても利用できます。
-Docker イメージのビルドと SIF 変換は利用環境で行ってください。
+これは Linux のホストネットワーク利用例です。SPADI を `spadi-raris` という
+名前の Docker コンテナで起動している場合は、ネットワーク名前空間を共有して
+接続することもできます（両方とも別のコンテナです）。
+
+```sh
+docker run --rm --network container:spadi-raris \
+  -e NESTDAQ_FEM_ID=0xc0a80a28 nestdaq-eicrecon:local
+```
+
+Docker Desktop でこの方法を用い、コンパイラーを遮断した完成イメージから
+2,815 TF・68,956 ヒットを受信し、各イベントの件数を照合しました。作成した
+イメージから SIF を作る方法は、まだ検証していません。
