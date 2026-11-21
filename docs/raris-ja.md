@@ -4,7 +4,7 @@ SPADI の RARiS リプレイは TimeFrameBuilder の PUSH ソケットから TF 
 送信します。このリポジトリのプラグインは EICrecon 側の PULL ソケットで
 受信します。SPADI 側には `spadi-containers-second-trial` の RARiS レシピを
 使用します。
-検証に使用した SPADI 側の変更は [PR #8](https://github.com/nobukoba/spadi-containers-second-trial/pull/8) にあり、まだ `main` にマージされていません。
+検証に使用した SPADI 側の変更は [PR #8](https://github.com/nobukoba/spadi-containers-second-trial/pull/8) で `main` にマージされています。
 
 EIC の既存イメージを起動し、このリポジトリのソースをコンテナにマウントして
 プラグインを自分でコンパイルします。ビルド結果はマウントした作業領域の

@@ -3,7 +3,7 @@
 The SPADI RARiS recipe sends TimeFrameBuilder output through a ZeroMQ PUSH
 socket; this plugin receives it with PULL. Use the RARiS recipe in
 `spadi-containers-second-trial` on the sending side. The SPADI changes used for
-validation are in [PR #8](https://github.com/nobukoba/spadi-containers-second-trial/pull/8), which is not yet merged into `main`.
+validation were merged into `main` in [PR #8](https://github.com/nobukoba/spadi-containers-second-trial/pull/8).
 
 Start an existing EIC image, mount this repository, and compile the plugin in
 that environment. The resulting `build/nestdaq_zmq_source.so` is saved in the
