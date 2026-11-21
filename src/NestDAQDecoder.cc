@@ -97,15 +97,7 @@ NestDAQTimeFrameData NestDAQDecoder::decode(
                 word_size
             );
 
-            const bool is_tdc_word =
-                bits.head == AmQStrTdc::Data::Data ||
-                bits.head == AmQStrTdc::Data::Trailer ||
-                bits.head == AmQStrTdc::Data::ThrottlingT1Start ||
-                bits.head == AmQStrTdc::Data::ThrottlingT1End ||
-                bits.head == AmQStrTdc::Data::ThrottlingT2Start ||
-                bits.head == AmQStrTdc::Data::ThrottlingT2End;
-
-            if (!is_tdc_word) {
+            if (bits.head != AmQStrTdc::Data::Data) {
                 continue;
             }
 
@@ -120,6 +112,11 @@ NestDAQTimeFrameData NestDAQDecoder::decode(
                 hit.channel = bits.hrch;
                 hit.charge = static_cast<std::int32_t>(bits.hrtot);
                 hit.timestamp = static_cast<std::int32_t>(bits.hrtdc);
+                decoded.tdc_hits.push_back(hit);
+            } else if (current_stf.femType == 3 || current_stf.femType == 6) {
+                hit.channel = bits.ch;
+                hit.charge = static_cast<std::int32_t>(bits.tot);
+                hit.timestamp = static_cast<std::int32_t>(bits.tdc);
                 decoded.tdc_hits.push_back(hit);
             }
         }
