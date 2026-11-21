@@ -13,6 +13,6 @@ echo "JANA_PLUGIN_PATH: ${JANA_PLUGIN_PATH}"
 
 eicrecon \
   -Pplugins=nestdaq_zmq_source \
-  -Pplugins_to_ignore=log,dd4hep,evaluator,acts,algorithms_init,pid_lut,richgeo,rootfile,beam,reco,tracking,pid,global_pid_lut,EEMC,BEMC,FEMC,EHCAL,BHCAL,FHCAL,B0ECAL,ZDC,BTRK,BVTX,PFRICH,DIRC,DRICH,ECTRK,MPGD,B0TRK,RPOTS,FOFFMTRK,BTOF,ECTOF,LOWQ2,LUMISPECCAL,podio,janatop,particle_flow \
+  -Pplugins_to_ignore=log,dd4hep,evaluator,acts,algorithms_init,pid_lut,richgeo,RICH-IRT,rootfile,beam,reco,tracking,pid,global_pid_lut,EEMC,BEMC,FEMC,EHCAL,BHCAL,FHCAL,B0ECAL,ZDC,BTRK,BVTX,PFRICH,DIRC,DRICH,ECTRK,MPGD,B0TRK,RPOTS,FOFFMTRK,BTOF,ECTOF,LOWQ2,LUMISPECCAL,podio,janatop,particle_flow \
   -Pnthreads=1 \
   -Pjana:loglevel=WARN

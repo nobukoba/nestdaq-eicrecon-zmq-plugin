@@ -1,0 +1,13 @@
+name: Decoder regression
+on:
+  push:
+  pull_request:
+jobs:
+  decoder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test high- and low-resolution data and control words
+        run: |
+          c++ -std=c++20 -Iinclude src/NestDAQDecoder.cc tests/test_decoder.cc -o /tmp/test-decoder
+          /tmp/test-decoder

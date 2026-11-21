@@ -1,5 +1,7 @@
 # nestdaq-eicrecon-zmq-plugin
 
+RARiS integration: [English](docs/raris-en.md) / [日本語](docs/raris-ja.md).
+
 JANA2/EICrecon plugin that receives NestDAQ `TimeFrameBuilder` output over ZeroMQ, decodes the NestDAQ multipart data, converts selected HRTDC hits into `edm4eic::RawTrackerHitCollection`, and passes those collections to downstream JANA2/EICrecon processors.
 
 ## Data flow
@@ -116,6 +118,14 @@ HRTDC channel  0-15 -> TOFBarrelADCTDC1, cellID 0-15
 HRTDC channel 16-31 -> TOFBarrelADCTDC2, cellID 0-15
 HRTDC channel 32-47 -> TOFBarrelADCTDC3, cellID 0-15
 ```
+
+Set `NESTDAQ_FEM_ID` to select a different FEM without changing the default;
+both decimal and `0x`-prefixed values are accepted. For the RARiS run 20
+sample, use `NESTDAQ_FEM_ID=0xc0a80a28`. The three collection names and
+channel-to-cell mapping above are an example, not a validated RARiS detector
+geometry or calibration. Hits outside channels 0–47 and other FEMs are not
+converted. The decoder handles high- and low-resolution TDC data words; control
+words are not hits.
 
 The converter creates a PODIO `Frame`, inserts the three `edm4eic::RawTrackerHitCollection` objects, and registers them in the `JEvent`.
 

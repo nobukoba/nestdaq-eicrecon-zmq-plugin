@@ -4,7 +4,24 @@
 #include <podio/Frame.h>
 
 #include <iostream>
+#include <cstdlib>
+#include <limits>
 #include <memory>
+#include <stdexcept>
+#include <string>
+
+EDM4eicConverter::EDM4eicConverter() : m_fem_id(0xc0a80a29) {
+    const char* value = std::getenv("NESTDAQ_FEM_ID");
+    if (!value) return;
+    const std::string text(value);
+    if (text.empty() || text[0] == '-' || text[0] == '+')
+        throw std::invalid_argument("NESTDAQ_FEM_ID must be a decimal or 0x-prefixed 32-bit integer");
+    std::size_t end = 0;
+    const auto id = std::stoull(text, &end, 0);
+    if (end != text.size() || id > std::numeric_limits<std::uint32_t>::max())
+        throw std::invalid_argument("NESTDAQ_FEM_ID must be a decimal or 0x-prefixed 32-bit integer");
+    m_fem_id = static_cast<std::uint32_t>(id);
+}
 
 void EDM4eicConverter::fill_event(
     const NestDAQTimeFrameData& decoded,
@@ -18,7 +35,7 @@ void EDM4eicConverter::fill_event(
         std::make_unique<edm4eic::RawTrackerHitCollection>();
 
     for (const auto& hit : decoded.tdc_hits) {
-        if (hit.fem_id != 0xc0a80a29) {
+        if (hit.fem_id != m_fem_id) {
             continue;
         }
 
